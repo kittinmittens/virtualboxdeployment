@@ -1,0 +1,42 @@
+#!/bin/bash
+#
+#me@danielpeluso.com
+#
+#check that arguments are passed for CPU - Mem - Num of IDE - Num of SATA.
+#
+# example command would be ./vboxparadploy $1-$2 $3 $4 $5 $6 $7 $8
+#$1 - $2 will determine how many vms to dpeloy
+#
+[ $# -ge 1 ] || { echo "Usage $0 <vmcount>"; exit 1; }
+
+FirstVM=$1
+LastVM=$2
+mem=$3
+cpu=$4
+sata=$5
+ide=$6
+satacontroller=$7
+ideacontroller=$8
+#[ ${LastVM} -ge ${FirstVM} ] || { echo "$0::First VM cannot be greater than last VM."; exit 1; }
+VmCount=$((LastVM-FirstVM + 1))
+echo "VmCount=[${VmCount}]"
+for ThisVM in `seq ${FirstVM} ${LastVM}`; do
+   VM="corp${ThisVM}"
+   echo "Creating: [${ThisVM}]"
+   vBoxManage showvminfo ${ThisVM} > /dev/null 2>&1
+   status=$?
+   [ $status -eq 0 ] && { echo "$0:[${ThisVM}] already exists."; continue; }
+   VBoxManage createhd --filename "corp${ThisVM}.vdi" --size 4096
+   VBoxManage createvm --name "corp${ThisVM}" --ostype "Linux26_64" --register
+   VBoxManage storagectl "corp${ThisVM}" --name "SATA Controller" --add ${sata} --controller ${satacontroller}
+   VBoxManage storageattach "corp${ThisVM}" --storagectl "SATA Controller" --port 0 --device 0 --type hdd --medium "corp${ThisVM}.vdi"
+   VBoxManage storagectl "corp${ThisVM}" --name "IDE Controller" --add ${ide}
+   VBoxManage storageattach "corp${ThisVM}" --storagectl "IDE Controller" --port 0 --device 0 --type dvddrive --medium /home/panda/Downloads/ubuntu-16.04.1-server-amd64.iso
+   VBoxManage modifyvm "corp${ThisVM}" --ioapic on
+   VBoxManage modifyvm "corp${ThisVM}" --boot1 dvd --boot2 disk --boot3 none
+   VBoxManage modifyvm "corp${ThisVM}" --memory ${mem} --vram 128
+   VBoxManage modifyvm "corp${ThisVM}" --cpus ${cpu}
+   VBoxManage modifyvm "corp${ThisVM}" --nic1 bridged --bridgeadapter1 e1000g
+
+
+done
